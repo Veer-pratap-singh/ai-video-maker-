@@ -142,94 +142,61 @@ def upload_video_to_temp_host(video_path: str, status_callback=None) -> str:
         raise RuntimeError(f"Temporary file upload failed: {response.status_code} - {response.text}")
 
 # ==========================================
-# 3. Instagram Graph API Publishing
+# 3. Instagram Direct Publishing (using instagrapi)
 # ==========================================
-def publish_to_instagram(video_path: str, caption: str, ig_user_id: str, access_token: str, status_callback=None):
+def publish_to_instagram(video_path: str, caption: str, username: str, password: str, status_callback=None):
     """
-    Publishes a video to Instagram Reels.
-    
-    Steps:
-    1. Upload video to tmpfiles.org.
-    2. Request Instagram container creation using public video URL.
-    3. Poll Instagram API until video finishes processing.
-    4. Trigger publish command for the media container.
+    Publishes a video to Instagram Reels using instagrapi (username/password).
     """
-    if not ig_user_id or not access_token:
-        raise ValueError("Instagram User ID and Page Access Token are required.")
+    if not username or not password:
+        raise ValueError("Instagram Username and Password are required.")
         
-    # Step 1: Upload to temp public hosting
-    public_url = upload_video_to_temp_host(video_path, status_callback)
-    
-    # Step 2: Initialize media container creation
     if status_callback:
-        status_callback("Creating Instagram Reels media container...")
+        status_callback("Initializing Instagram Client...")
         
-    container_url = f"https://graph.facebook.com/v19.0/{ig_user_id}/media"
-    payload = {
-        "media_type": "REELS",
-        "video_url": public_url,
-        "caption": caption,
-        "access_token": access_token
-    }
+    try:
+        from instagrapi import Client
+    except ImportError:
+        raise ImportError("instagrapi library not found. Please run 'pip install instagrapi'.")
+        
+    cl = Client()
     
-    response = requests.post(container_url, data=payload, timeout=30)
-    res_data = response.json()
-    
-    if response.status_code != 200 or "id" not in res_data:
-        raise RuntimeError(f"Instagram Container Creation failed: {res_data}")
-        
-    container_id = res_data["id"]
-    if status_callback:
-        status_callback(f"Container created (ID: {container_id}). Waiting for Instagram to process the video...")
-        
-    # Step 3: Poll Container status
-    check_url = f"https://graph.facebook.com/v19.0/{container_id}"
-    params = {
-        "fields": "status_code,status",
-        "access_token": access_token
-    }
-    
-    # Instagram encoding and fetching can take 30 to 120 seconds
-    max_retries = 30
-    retry_delay = 10
-    
-    for i in range(max_retries):
-        time.sleep(retry_delay)
-        poll_response = requests.get(check_url, params=params, timeout=15)
-        poll_data = poll_response.json()
-        
-        status_code = poll_data.get("status_code")
-        status_text = poll_data.get("status", "Unknown")
-        
+    # Optional: Cache login session locally to avoid logging in on every run
+    session_file = "instagram_session.json"
+    session_loaded = False
+    if os.path.exists(session_file):
+        try:
+            cl.load_settings(session_file)
+            cl.login(username, password)
+            session_loaded = True
+            if status_callback:
+                status_callback("Logged in using cached session settings.")
+        except Exception as e:
+            if status_callback:
+                status_callback(f"Cached session expired or invalid: {e}. Logging in fresh...")
+                
+    if not session_loaded:
         if status_callback:
-            status_callback(f"Check status: {status_code} ({status_text}) - Attempt {i+1}/{max_retries}")
+            status_callback(f"Logging in to Instagram as {username}...")
+        try:
+            cl.login(username, password)
+            cl.dump_settings(session_file)
+        except Exception as e:
+            raise RuntimeError(f"Instagram Login Failed: {e}")
             
-        if status_code == "FINISHED":
-            break
-        elif status_code == "ERROR":
-            raise RuntimeError(f"Instagram video processing failed: {poll_data}")
-    else:
-        raise TimeoutError("Instagram video processing timed out on the Graph API side.")
-        
-    # Step 4: Publish the container
     if status_callback:
-        status_callback("Instagram processing finished! Publishing Reel now...")
+        status_callback("Uploading Reel video to Instagram (this might take a few moments)...")
         
-    publish_url = f"https://graph.facebook.com/v19.0/{ig_user_id}/media_publish"
-    publish_payload = {
-        "creation_id": container_id,
-        "access_token": access_token
-    }
-    
-    pub_response = requests.post(publish_url, data=publish_payload, timeout=30)
-    pub_data = pub_response.json()
-    
-    if pub_response.status_code != 200 or "id" not in pub_data:
-        raise RuntimeError(f"Reel publishing failed: {pub_data}")
-        
-    post_id = pub_data["id"]
-    if status_callback:
-        status_callback(f"Successfully published Reel! Reel ID: {post_id}")
-        
-    # We return the direct post link format if possible, otherwise just confirmation
-    return f"https://www.instagram.com/p/{post_id}"
+    try:
+        # instagrapi handles video processing/uploading internally
+        media = cl.video_upload(
+            video_path,
+            caption=caption,
+            reel=True
+        )
+        media_id = media.id
+        if status_callback:
+            status_callback(f"Successfully uploaded Reel! Media ID: {media_id}")
+        return f"https://www.instagram.com/reel/{media.code}/"
+    except Exception as e:
+        raise RuntimeError(f"Reels upload failed: {e}")

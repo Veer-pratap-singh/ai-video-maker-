@@ -145,24 +145,24 @@ with st.sidebar:
             type="password",
             help="Required for auto-generating scripts."
         )
-        instagram_uid = st.text_input(
-            "Instagram User ID", 
-            value=os.getenv("INSTAGRAM_USER_ID", ""), 
-            help="Facebook Graph ID associated with your business account."
+        instagram_username = st.text_input(
+            "Instagram Username", 
+            value=os.getenv("INSTAGRAM_USERNAME", ""), 
+            help="Your direct Instagram login username."
         )
-        instagram_token = st.text_input(
-            "Instagram Access Token", 
-            value=os.getenv("INSTAGRAM_ACCESS_TOKEN", ""), 
+        instagram_password = st.text_input(
+            "Instagram Password", 
+            value=os.getenv("INSTAGRAM_PASSWORD", ""), 
             type="password",
-            help="Permanent page access token with publish scopes."
+            help="Your direct Instagram login password."
         )
         
         if st.button("Save Keys to .env"):
             with open(".env", "w") as env_file:
                 env_file.write(f"PEXELS_API_KEY={pexels_key}\n")
                 env_file.write(f"GEMINI_API_KEY={gemini_key}\n")
-                env_file.write(f"INSTAGRAM_USER_ID={instagram_uid}\n")
-                env_file.write(f"INSTAGRAM_ACCESS_TOKEN={instagram_token}\n")
+                env_file.write(f"INSTAGRAM_USERNAME={instagram_username}\n")
+                env_file.write(f"INSTAGRAM_PASSWORD={instagram_password}\n")
             st.success("Credentials saved to .env file!")
             
     # 2. YouTube client_secrets.json Upload
@@ -570,8 +570,8 @@ with tab3:
             
             # Instagram Block
             st.markdown("#### 📸 Publish to Instagram")
-            if not instagram_uid or not instagram_token:
-                st.warning("Instagram Upload is locked. Please configure User ID and Access Token in the sidebar first.")
+            if not instagram_username or not instagram_password:
+                st.warning("Instagram Upload is locked. Please configure Username and Password in the sidebar first.")
                 instagram_ready = False
             else:
                 instagram_ready = True
@@ -585,10 +585,10 @@ with tab3:
                     ig_url = publisher.publish_to_instagram(
                         video_path=st.session_state.rendered_video,
                         caption=pub_description,
-                        ig_user_id=instagram_uid,
-                        access_token=instagram_token,
+                        username=instagram_username,
+                        password=instagram_password,
                         status_callback=ig_status
                     )
-                    ig_log.success(f"🎉 Instagram upload complete! Reel ID / URL: {ig_url}")
+                    ig_log.success(f"🎉 Instagram upload complete! Reel URL: {ig_url}")
                 except Exception as e:
                     ig_log.error(f"❌ Instagram Upload Failed: {e}")
