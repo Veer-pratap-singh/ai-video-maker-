@@ -278,7 +278,7 @@ with tab_chat:
                     try:
                         import google.generativeai as genai
                         genai.configure(api_key=gemini_key)
-                        model = genai.GenerativeModel("gemini-1.5-flash")
+                        model = genai.GenerativeModel("gemini-2.5-flash")
                         
                         # Build standard history list for Gemini
                         conversation = ""
@@ -347,7 +347,7 @@ with tab1:
                 import google.generativeai as genai
                 try:
                     genai.configure(api_key=gemini_key)
-                    model = genai.GenerativeModel("gemini-1.5-flash")
+                    model = genai.GenerativeModel("gemini-2.5-flash")
                     
                     prompt = f"""
                     You are an expert short-form video scriptwriter for YouTube Shorts and Instagram Reels.
